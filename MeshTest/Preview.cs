@@ -27,10 +27,7 @@ namespace mikity.ghComponents
             }
             if (listNormal != null)
             {
-                if (select < listNormal.Count)
-                {
-                    args.Display.DrawLines(listNormal[select], System.Drawing.Color.Green);
-                }
+                args.Display.DrawLines(listNormal, System.Drawing.Color.Green);
             }
         }
     }

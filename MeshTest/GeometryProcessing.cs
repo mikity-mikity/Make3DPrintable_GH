@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Rhino.Geometry;
+using ShoNS.Array;
 namespace mikity.GeometryProcessing
 {
     class face
@@ -78,7 +79,7 @@ namespace mikity.GeometryProcessing
         public List<face> faces = new List<face>();
         public List<halfedge> halfedges = new List<halfedge>();
         public List<vertex> innerVertices = new List<vertex>();
-        public List<vertex> outerVertices = new List<vertex>();
+        public List<vertex> outerVertices = new List<vertex>();  
         private halfedge[,] __halfedgeTable;
         private List<face>[,] _faceTable;
         private orient[] __orientation;
