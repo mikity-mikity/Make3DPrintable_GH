@@ -24,11 +24,20 @@ namespace mikity.GeometryProcessing
         public vertex P;
         public face owner;
         public halfedge pair, next, prev;
+        //Warning
+        //After boundary halfedges are appropriately setup, Naked halfedges should not exist.
         public bool isNaked
         {
             get
             {
                 return pair == null ? true : false;
+            }
+        }
+        public bool isBoundary
+        {
+            get
+            {
+                return owner == null ? true : false;
             }
         }
         public halfedge(vertex _P)
@@ -43,14 +52,14 @@ namespace mikity.GeometryProcessing
         public List<halfedge> star = new List<halfedge>();
         public List<halfedge> onering = new List<halfedge>();
         public halfedge hf_begin;
-        public halfedge hf_end;
-        public bool isNaked
+        //public halfedge hf_end;
+        /*public bool isNaked
         {
             get
             {
                 return hf_begin == hf_end ? false : true;
             }
-        }
+        }*/
         public vertex(int _N)
         {
             N = _N;
@@ -74,7 +83,9 @@ namespace mikity.GeometryProcessing
     {
         //to get boundary chain
         //boundaryStart->hf->next->P->hf->next->P->....
-        public vertex boundaryStart;
+        //
+        //public vertex boundaryStart;
+        public halfedge boundaryStart;
         public List<vertex> vertices = new List<vertex>();
         public List<face> faces = new List<face>();
         public List<halfedge> halfedges = new List<halfedge>();
@@ -88,15 +99,8 @@ namespace mikity.GeometryProcessing
             var res = new List<halfedge>();
             foreach (var e in halfedges)
             {
-                if (e.isNaked)
-                {
+                if (e.P.N < e.next.P.N)
                     res.Add(e);
-                }
-                else
-                {
-                    if (e.P.N < e.next.P.N)
-                        res.Add(e);
-                }
             }
             return res;
         }
@@ -174,27 +178,75 @@ namespace mikity.GeometryProcessing
                 }
             }
             //post process to find boundary vertices
+
+            //align the first half edge at boundary
             foreach (var v in vertices)
             {
                 var h = v.hf_begin;
-                v.hf_end = h;
+                //v.hf_end = h;
                 do
                 {
                     if (h.prev.isNaked)
                     {
-                        v.hf_end = h.prev;
+                        //v.hf_end = h.prev;
                         while (!h.isNaked)
                         {
                             h = h.pair.next;
                         }
                         v.hf_begin = h;
-                        if (this.boundaryStart == null) this.boundaryStart = v;
                         break;
                     }
                     h = h.prev.pair;
                 } while (h != v.hf_begin);
             }
-
+            List<halfedge> boundary_complement = new List<halfedge>();
+            foreach (var v in vertices)
+            {
+                var h = v.hf_begin;
+                if (h.isNaked)//first naked halfedge found
+                {
+                    do
+                    {
+                        boundary_complement.Add(h);
+                        h = h.next.P.hf_begin;
+                    } while (h != v.hf_begin);
+                    break;
+                }
+            }
+            //insert boundary halfedges
+            List<halfedge> boundary = new List<halfedge>();
+            for (int i = 0; i < boundary_complement.Count; i++)
+            {
+                boundary.Add(new halfedge(boundary_complement[i].next.P));
+                boundary[i].pair = boundary_complement[i];
+                boundary_complement[i].pair = boundary[i];
+            } halfedges.AddRange(boundary);
+            boundaryStart = boundary[0];
+            for (int i = 0; i < boundary.Count; i++)
+            {
+                boundary[i].owner = null;
+                if (i!=0)
+                {
+                    boundary[i].next = boundary_complement[i - 1].pair;
+                }
+                else
+                {
+                    boundary[i].next = boundary_complement[boundary_complement.Count-1].pair;
+                }
+                if (i != boundary.Count - 1)
+                {
+                    boundary[i].prev = boundary_complement[i + 1].pair;
+                }
+                else
+                {
+                    boundary[i].prev = boundary_complement[0].pair;
+                }
+            }
+            //check if any naked halfedge survives
+            foreach (var e in halfedges)
+            {
+                if (e.isNaked) System.Windows.Forms.MessageBox.Show("error");
+            }
             //post process to create stars
             foreach (var v in vertices)
             {
@@ -203,7 +255,7 @@ namespace mikity.GeometryProcessing
                 do
                 {
                     v.star.Add(h);
-                    if (h.prev.isNaked) break;
+                    if (h.isBoundary) break;
                     h = h.prev.pair;
                 } while (h != v.hf_begin);
             }
@@ -219,7 +271,7 @@ namespace mikity.GeometryProcessing
                         h = h.next;
                         v.onering.Add(h);
                     } while (h.next.next.P != v);
-                    if (h.next.isNaked) break;
+                    if (h.next.pair.isBoundary) break;
                     h = h.next.pair;
                 } while (h != v.hf_begin);
             }
@@ -228,7 +280,7 @@ namespace mikity.GeometryProcessing
             outerVertices.Clear();
             foreach (var v in vertices)
             {
-                if (v.hf_begin.isNaked) outerVertices.Add(v); else innerVertices.Add(v);
+                if (v.hf_begin.pair.isBoundary) outerVertices.Add(v); else innerVertices.Add(v);
             }
         }
         private void halfEdgeAdd(face f)

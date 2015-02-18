@@ -206,7 +206,8 @@ namespace mikity.ghComponents
             }
             List<double> grads = new List<double>();
             List<double> residuals = new List<double>();
-            for (int i = 0; i < 10; i++)
+            double tol = 0.00000001;
+            for (int i = 0; i < 50; i++)
             {
                 var jacob = computeJacob(numvar, numcon, MS, nodes, x);
                 var res = computeResidual(numvar, numcon, MS, nodes, x);
@@ -214,8 +215,9 @@ namespace mikity.ghComponents
                 var solve = new ShoNS.Array.SVD(S);
                 var dx = jacob.T.Multiply(solve.Solve(-res));
                 x += dx;
+                if (res.Norm() < tol) break;
             }
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 500; i++)
             {
                 var grad = computeGradient(numvar, MS, nodes, x, normalPerFaces);
                 var jacob = computeJacob(numvar, numcon, MS, nodes, x);
@@ -228,14 +230,19 @@ namespace mikity.ghComponents
                 var dx = sol.Solve(-projGrad.T);
                 grads.Add(projGrad.Norm());
                 x += dx;
-                jacob = computeJacob(numvar, numcon, MS, nodes, x);
-                var res = computeResidual(numvar, numcon, MS, nodes, x);
-                S = jacob.Multiply(jacob.T);
-                solve = new ShoNS.Array.SVD(S);
-                dx = jacob.T.Multiply(solve.Solve(-res));
-                x += dx;
+                DoubleArray res=DoubleArray.Zeros(numcon,1);
+                for (int j = 0; j < 50; j++)
+                {
+                    jacob = computeJacob(numvar, numcon, MS, nodes, x);
+                    res = computeResidual(numvar, numcon, MS, nodes, x);
+                    S = jacob.Multiply(jacob.T);
+                    solve = new ShoNS.Array.SVD(S);
+                    dx = jacob.T.Multiply(solve.Solve(-res));
+                    x += dx;
+                    if (res.Norm() < tol) break;
+                }
                 residuals.Add(res.Norm());
-                if (projGrad.Norm() < 0.000001 && res.Norm() < 0.000001) break;
+                if (projGrad.Norm() < tol && res.Norm() < tol) break;
             }
             inMesh = myMesh.DuplicateMesh();
             outMesh = myMesh.DuplicateMesh();
@@ -249,6 +256,7 @@ namespace mikity.ghComponents
                 N.X = x[index * 3 + 0, 0];
                 N.Y = x[index * 3 + 1, 0];
                 N.Z = x[index * 3 + 2, 0];
+
                 listNormal.Add(new Line(nodes[v.N], nodes[v.N] + N));
             }
             DA.SetDataList(0, grads);
