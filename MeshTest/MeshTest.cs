@@ -15,65 +15,67 @@ namespace mikity.ghComponents
         public int select = 0;
         public double thickness = 1d;
         public List<Line> listNormal;
-        private DoubleArray computeGradient(int numvar, MeshStructure MS, List<Point3d> nodes, DoubleArray x, Vector3d[] normalPerFaces)
+        private void computeGradient(DoubleArray grad,vertex v,MeshStructure MS, DoubleArray x, Vector3d[] normalPerFaces)
         {
-            DoubleArray grad = DoubleArray.Zeros(1, numvar);
-            foreach (var v in MS.vertices)
+            grad[0, 0] = 0;
+            grad[1, 0] = 0;
+            grad[2, 0] = 0;
+            foreach (var e in v.onering)
             {
-                foreach (var e in v.onering)
-                {
-                    var N = normalPerFaces[e.owner.N];
-                    int index = MS.vertices.IndexOf(v);
-                    var cx = x[index * 3 + 0, 0];
-                    var cy = x[index * 3 + 1, 0];
-                    var cz = x[index * 3 + 2, 0];
-                    grad[0, index * 3 + 0] += 2 * N.X * N.X * cx + 2 * N.X * N.Y * cy + 2 * N.X * N.Z * cz - 2 * N.X;
-                    grad[0, index * 3 + 1] += 2 * N.Y * N.Y * cy + 2 * N.Y * N.Z * cz + 2 * N.Y * N.X * cx - 2 * N.Y;
-                    grad[0, index * 3 + 2] += 2 * N.Z * N.Z * cz + 2 * N.Z * N.X * cx + 2 * N.Z * N.Y * cy - 2 * N.Z;
-                    var dot = cx * N.X + cy * N.Y + cz * N.Z;
-                    var norm = N.SquareLength;
-                    grad[0, index * 3 + 0] += (2 * cx - 4 * dot * N.X + norm * 2 * dot * N.X);
-                    grad[0, index * 3 + 1] += (2 * cy - 4 * dot * N.Y + norm * 2 * dot * N.Y);
-                    grad[0, index * 3 + 2] += (2 * cz - 4 * dot * N.Z + norm * 2 * dot * N.Z);
-                }
+                var N = normalPerFaces[e.owner.N];
+                int index = MS.vertices.IndexOf(v);
+                var cx = x[index * 3 + 0, 0];
+                var cy = x[index * 3 + 1, 0];
+                var cz = x[index * 3 + 2, 0];
+                grad[0,0] += 2 * N.X * N.X * cx + 2 * N.X * N.Y * cy + 2 * N.X * N.Z * cz - 2 * N.X;
+                grad[1, 0] += 2 * N.Y * N.Y * cy + 2 * N.Y * N.Z * cz + 2 * N.Y * N.X * cx - 2 * N.Y;
+                grad[2, 0] += 2 * N.Z * N.Z * cz + 2 * N.Z * N.X * cx + 2 * N.Z * N.Y * cy - 2 * N.Z;
+                var dot = cx * N.X + cy * N.Y + cz * N.Z;
+                var norm = N.SquareLength;
+                grad[0, 0] += 0.01 * (2 * cx - 4 * dot * N.X + norm * 2 * dot * N.X);
+                grad[1, 0] += 0.01 * (2 * cy - 4 * dot * N.Y + norm * 2 * dot * N.Y);
+                grad[2, 0] += 0.01 * (2 * cz - 4 * dot * N.Z + norm * 2 * dot * N.Z);
             }
-            return grad;
         }
-        private SparseDoubleArray computeHessian(int numvar, MeshStructure MS, List<Point3d> nodes, DoubleArray x, Vector3d[] normalPerFaces)
+        private void computeHessian(DoubleArray hess, vertex v, MeshStructure MS, DoubleArray x, Vector3d[] normalPerFaces)
         {
-            SparseDoubleArray hess = SparseDoubleArray.Zeros(numvar, numvar);
-            foreach (var v in MS.vertices)
+            hess[0, 0] = 0;
+            hess[0, 1] = 0;
+            hess[0, 2] = 0;
+            hess[1, 0] = 0;
+            hess[1, 1] = 0;
+            hess[1, 2] = 0;
+            hess[2, 0] = 0;
+            hess[2, 1] = 0;
+            hess[2, 2] = 0;
+            foreach (var e in v.onering)
             {
-                foreach (var e in v.onering)
-                {
-                    var N = normalPerFaces[e.owner.N];
-                    int index = MS.vertices.IndexOf(v);
-                    var cx = x[index * 3 + 0, 0];
-                    var cy = x[index * 3 + 1, 0];
-                    var cz = x[index * 3 + 2, 0];
-                    hess[index * 3 + 0, index * 3 + 0] += 2 * N.X * N.X;
-                    hess[index * 3 + 1, index * 3 + 0] += 2 * N.X * N.Y;
-                    hess[index * 3 + 2, index * 3 + 0] += 2 * N.X * N.Z;
-                    hess[index * 3 + 0, index * 3 + 1] += 2 * N.Y * N.X;
-                    hess[index * 3 + 1, index * 3 + 1] += 2 * N.Y * N.Y;
-                    hess[index * 3 + 2, index * 3 + 1] += 2 * N.Y * N.Z;
-                    hess[index * 3 + 0, index * 3 + 2] += 2 * N.Z * N.X;
-                    hess[index * 3 + 1, index * 3 + 2] += 2 * N.Z * N.Y;
-                    hess[index * 3 + 2, index * 3 + 2] += 2 * N.Z * N.Z;
-                    var dot = cx * N.X + cy * N.Y + cz * N.Z;
-                    var norm = N.SquareLength;
-                    hess[index * 3 + 0, index * 3 + 0] += (2 - 4 * N.X * N.X + norm * 2 * N.X * N.X);
-                    hess[index * 3 + 1, index * 3 + 0] += (-4 * N.Y * N.X + norm * 2 * N.Y * N.X);
-                    hess[index * 3 + 2, index * 3 + 0] += (-4 * N.Z * N.X + norm * 2 * N.Z * N.X);
-                    hess[index * 3 + 1, index * 3 + 1] += (2 - 4 * N.Y * N.Y + norm * 2 * N.Y * N.Y);
-                    hess[index * 3 + 2, index * 3 + 1] += (-4 * N.Z * N.Y + norm * 2 * N.Z * N.Y);
-                    hess[index * 3 + 0, index * 3 + 1] += (-4 * N.X * N.Y + norm * 2 * N.X * N.Y);
-                    hess[index * 3 + 2, index * 3 + 2] += (2 - 4 * N.Z * N.Z + norm * 2 * N.Z * N.Z);
-                    hess[index * 3 + 0, index * 3 + 2] += (-4 * N.X * N.Z + norm * 2 * N.X * N.Z);
-                    hess[index * 3 + 1, index * 3 + 2] += (-4 * N.Y * N.Z + norm * 2 * N.Y * N.Z);
-                }
+                var N = normalPerFaces[e.owner.N];
+                int index = MS.vertices.IndexOf(v);
+                var cx = x[index * 3 + 0, 0];
+                var cy = x[index * 3 + 1, 0];
+                var cz = x[index * 3 + 2, 0];
+                hess[ 0,0] += 2 * N.X * N.X;
+                hess[ 1,0] += 2 * N.X * N.Y;
+                hess[ 2, 0] += 2 * N.X * N.Z;
+                hess[0, 1] += 2 * N.Y * N.X;
+                hess[ 1, 1] += 2 * N.Y * N.Y;
+                hess[ 2,1] += 2 * N.Y * N.Z;
+                hess[0,  2] += 2 * N.Z * N.X;
+                hess[ 1,2] += 2 * N.Z * N.Y;
+                hess[2, 2] += 2 * N.Z * N.Z;
+                var dot = cx * N.X + cy * N.Y + cz * N.Z;
+                var norm = N.SquareLength;
+                hess[ 0,  0] +=0.01* (2 - 4 * N.X * N.X + norm * 2 * N.X * N.X);
+                hess[1, 0] += 0.01 * (-4 * N.Y * N.X + norm * 2 * N.Y * N.X);
+                hess[2, 0] += 0.01 * (-4 * N.Z * N.X + norm * 2 * N.Z * N.X);
+                hess[1, 1] += 0.01 * (2 - 4 * N.Y * N.Y + norm * 2 * N.Y * N.Y);
+                hess[2, 1] += 0.01 * (-4 * N.Z * N.Y + norm * 2 * N.Z * N.Y);
+                hess[0, 1] += 0.01 * (-4 * N.X * N.Y + norm * 2 * N.X * N.Y);
+                hess[2, 2] += 0.01 * (2 - 4 * N.Z * N.Z + norm * 2 * N.Z * N.Z);
+                hess[0, 2] += 0.01 * (-4 * N.X * N.Z + norm * 2 * N.X * N.Z);
+                hess[1, 2] += 0.01 * (-4 * N.Y * N.Z + norm * 2 * N.Y * N.Z);
             }
-            return hess;
         }
         private DoubleArray computeResidual(int numvar, int numcon, MeshStructure MS, List<Point3d> nodes, DoubleArray x)
         {
@@ -157,7 +159,6 @@ namespace mikity.ghComponents
         protected override void RegisterOutputParams(Grasshopper.Kernel.GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddNumberParameter("grad", "grad", "grad", Grasshopper.Kernel.GH_ParamAccess.list);
-            pManager.AddNumberParameter("residual", "residual", "residual", Grasshopper.Kernel.GH_ParamAccess.list);
         }
         protected override void SolveInstance(Grasshopper.Kernel.IGH_DataAccess DA)
         {
@@ -176,7 +177,7 @@ namespace mikity.ghComponents
                 }
             }
             DoubleArray x = DoubleArray.Zeros(numvar, 1);
-            //DoubleArray q = DoubleArray.Zeros(numvar, 1);
+            DoubleArray q = DoubleArray.Zeros(numvar, 1);
             List<Point3d> nodes = new List<Point3d>();
             Vector3d[] normalPerFaces = new Vector3d[MS.nFaces];
             nodes.AddRange(myMesh.Vertices.ToPoint3dArray());
@@ -207,42 +208,26 @@ namespace mikity.ghComponents
             List<double> grads = new List<double>();
             List<double> residuals = new List<double>();
             double tol = 0.00000001;
-            for (int i = 0; i < 50; i++)
+            var grad = new DoubleArray(3, 1);
+            var hess = new DoubleArray(3, 3);
+            foreach (var v in MS.vertices)
             {
-                var jacob = computeJacob(numvar, numcon, MS, nodes, x);
-                var res = computeResidual(numvar, numcon, MS, nodes, x);
-                var S = jacob.Multiply(jacob.T);
-                var solve = new ShoNS.Array.SVD(S);
-                var dx = jacob.T.Multiply(solve.Solve(-res));
-                x += dx;
-                if (res.Norm() < tol) break;
-            }
-            for (int i = 0; i < 500; i++)
-            {
-                var grad = computeGradient(numvar, MS, nodes, x, normalPerFaces);
-                var jacob = computeJacob(numvar, numcon, MS, nodes, x);
-                var S = jacob.Multiply(jacob.T);
-                var solve = new ShoNS.Array.SVD(S.T);
-                var lambda = solve.Solve(jacob.Multiply(-grad.T)).T;
-                var projGrad = grad + lambda * jacob;
-                var hess = computeHessian(numvar, MS, nodes, x, normalPerFaces);
-                var sol = new SparseLU(hess);
-                var dx = sol.Solve(-projGrad.T);
-                grads.Add(projGrad.Norm());
-                x += dx;
-                DoubleArray res=DoubleArray.Zeros(numcon,1);
-                for (int j = 0; j < 50; j++)
+                for (int i = 0; i < 500; i++)
                 {
-                    jacob = computeJacob(numvar, numcon, MS, nodes, x);
-                    res = computeResidual(numvar, numcon, MS, nodes, x);
-                    S = jacob.Multiply(jacob.T);
-                    solve = new ShoNS.Array.SVD(S);
-                    dx = jacob.T.Multiply(solve.Solve(-res));
-                    x += dx;
-                    if (res.Norm() < tol) break;
+                    computeGradient(grad, v, MS, x, normalPerFaces);
+                    computeHessian(hess, v, MS, x, normalPerFaces);
+                    var sol = new LU(hess);
+                    var dx = sol.Solve(-grad);
+                    int index = MS.vertices.IndexOf(v);
+                    x[index * 3 + 0, 0] += dx[0, 0];
+                    x[index * 3 + 1, 0] += dx[1, 0];
+                    x[index * 3 + 2, 0] += dx[2, 0];
+                    if (grad.Norm() < tol)
+                    {
+                        grads.Add(i);
+                        break;
+                    }
                 }
-                residuals.Add(res.Norm());
-                if (projGrad.Norm() < tol && res.Norm() < tol) break;
             }
             inMesh = myMesh.DuplicateMesh();
             outMesh = myMesh.DuplicateMesh();
@@ -260,7 +245,6 @@ namespace mikity.ghComponents
                 listNormal.Add(new Line(nodes[v.N], nodes[v.N] + N));
             }
             DA.SetDataList(0, grads);
-            DA.SetDataList(1, residuals);
         }
     }
 }
