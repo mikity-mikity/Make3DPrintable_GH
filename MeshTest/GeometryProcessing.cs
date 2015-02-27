@@ -85,7 +85,7 @@ namespace mikity.GeometryProcessing
         //boundaryStart->hf->next->P->hf->next->P->....
         //
         //public vertex boundaryStart;
-        public halfedge boundaryStart;
+        public halfedge[] boundaryStart;
         public List<vertex> vertices = new List<vertex>();
         public List<face> faces = new List<face>();
         public List<halfedge> halfedges = new List<halfedge>();
@@ -134,7 +134,7 @@ namespace mikity.GeometryProcessing
             __orientation = new orient[_nFaces];
             _faceTable = new List<face>[_nVertices, _nVertices];
             __halfedgeTable = new halfedge[_nVertices, _nVertices];
-
+          
             for (int i = 0; i < __orientation.Count(); i++)
             {
                 __orientation[i] = orient.unknown;
@@ -199,47 +199,67 @@ namespace mikity.GeometryProcessing
                     h = h.prev.pair;
                 } while (h != v.hf_begin);
             }
-            List<halfedge> boundary_complement = new List<halfedge>();
+            List<List<halfedge>> boundary_complements = new List<List<halfedge>>();
+            int nBoundary = 0;
             foreach (var v in vertices)
             {
                 var h = v.hf_begin;
                 if (h.isNaked)//first naked halfedge found
                 {
-                    do
+                    bool flag = true;
+                    for (int i = 0; i < nBoundary; i++)
                     {
-                        boundary_complement.Add(h);
-                        h = h.next.P.hf_begin;
-                    } while (h != v.hf_begin);
-                    break;
+                        if(boundary_complements[i].Contains(h))
+                        {
+                            flag = false;
+                            break;
+                        }
+                    }
+                    if (flag)
+                    {
+                        boundary_complements.Add(new List<halfedge>());
+                        do
+                        {
+                            boundary_complements[nBoundary].Add(h);
+                            h = h.next.P.hf_begin;
+                        } while (h != v.hf_begin);
+                        nBoundary++;
+                    }
+                    //break;
                 }
             }
             //insert boundary halfedges
-            List<halfedge> boundary = new List<halfedge>();
-            for (int i = 0; i < boundary_complement.Count; i++)
+            boundaryStart = new halfedge[nBoundary];
+            foreach (var boundary_complement in boundary_complements)
             {
-                boundary.Add(new halfedge(boundary_complement[i].next.P));
-                boundary[i].pair = boundary_complement[i];
-                boundary_complement[i].pair = boundary[i];
-            } halfedges.AddRange(boundary);
-            boundaryStart = boundary[0];
-            for (int i = 0; i < boundary.Count; i++)
-            {
-                boundary[i].owner = null;
-                if (i!=0)
+                List<halfedge> boundary = new List<halfedge>();
+                for (int i = 0; i < boundary_complement.Count; i++)
                 {
-                    boundary[i].next = boundary_complement[i - 1].pair;
+                    boundary.Add(new halfedge(boundary_complement[i].next.P));
+                    boundary[i].pair = boundary_complement[i];
+                    boundary_complement[i].pair = boundary[i];
                 }
-                else
+                halfedges.AddRange(boundary);
+                boundaryStart[boundary_complements.IndexOf(boundary_complement)] = boundary[0];
+                for (int i = 0; i < boundary.Count; i++)
                 {
-                    boundary[i].next = boundary_complement[boundary_complement.Count-1].pair;
-                }
-                if (i != boundary.Count - 1)
-                {
-                    boundary[i].prev = boundary_complement[i + 1].pair;
-                }
-                else
-                {
-                    boundary[i].prev = boundary_complement[0].pair;
+                    boundary[i].owner = null;
+                    if (i != 0)
+                    {
+                        boundary[i].next = boundary_complement[i - 1].pair;
+                    }
+                    else
+                    {
+                        boundary[i].next = boundary_complement[boundary_complement.Count - 1].pair;
+                    }
+                    if (i != boundary.Count - 1)
+                    {
+                        boundary[i].prev = boundary_complement[i + 1].pair;
+                    }
+                    else
+                    {
+                        boundary[i].prev = boundary_complement[0].pair;
+                    }
                 }
             }
             //check if any naked halfedge survives
