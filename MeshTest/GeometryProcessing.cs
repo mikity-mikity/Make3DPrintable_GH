@@ -7,6 +7,17 @@ using Rhino.Geometry;
 using ShoNS.Array;
 namespace mikity.GeometryProcessing
 {
+    class tuple
+    {
+        public face f;
+        public int J;
+        public tuple(face _f, int _J)
+        {
+            f = _f;
+            J = _J;
+
+        }
+    }
     class face
     {
         public face(int _N, params int[] indices)
@@ -91,8 +102,10 @@ namespace mikity.GeometryProcessing
         public List<halfedge> halfedges = new List<halfedge>();
         public List<vertex> innerVertices = new List<vertex>();
         public List<vertex> outerVertices = new List<vertex>();  
-        private halfedge[,] __halfedgeTable;
-        private List<face>[,] _faceTable;
+        //private halfedge[,] __halfedgeTable;
+        //private List<face>[,] _faceTable;
+        List<halfedge>[] __halfedgeTable;
+        List<tuple>[] _faceTable;
         private orient[] __orientation;
         public List<halfedge> edges()
         {
@@ -126,15 +139,43 @@ namespace mikity.GeometryProcessing
         {
             unknown, positive, negative
         }
+        void getfaces(int I, int J, List<face> faces)
+        {
+            if (faces == null) faces = new List<face>();
+            faces.Clear();
+            var ff = _faceTable[I];
+            foreach (var f in ff)
+            {
+                if (f.J==J) faces.Add(f.f);
+            }
+        }
+        void gethalfedges(int I, int J, List<halfedge> lhalfedges)
+        {
+            if (lhalfedges == null) lhalfedges  = new List<halfedge>();
+            lhalfedges.Clear();
+            var ff = __halfedgeTable[I];
+            foreach (var f in ff)
+            {
+                if (f.next.P.N == J) lhalfedges.Add(f);
+            }
+        }
+
         private void Construct(Mesh val)
         {
             int _nVertices = val.Vertices.Count;
             int _nFaces = val.Faces.Count;
 
             __orientation = new orient[_nFaces];
-            _faceTable = new List<face>[_nVertices, _nVertices];
-            __halfedgeTable = new halfedge[_nVertices, _nVertices];
-          
+            //_faceTable = new List<face>[_nVertices, _nVertices];
+            //__halfedgeTable = new halfedge[_nVertices, _nVertices];
+            
+            _faceTable = new List<tuple>[_nVertices];
+            __halfedgeTable = new List<halfedge>[_nVertices];
+            for (int i = 0; i < _nVertices; i++)
+            {
+                _faceTable[i] = new List<tuple>();
+                __halfedgeTable[i] = new List<halfedge>();
+            }
             for (int i = 0; i < __orientation.Count(); i++)
             {
                 __orientation[i] = orient.unknown;
@@ -155,26 +196,30 @@ namespace mikity.GeometryProcessing
             }
             //Recursive
             halfEdgeAdd(faces[0]);
+            List<halfedge> lhalfedges = new List<halfedge>();
             //find pairs
             foreach (var h in halfedges)
             {
                 int i = h.P.N;
                 int j = h.next.P.N;
-                if (__halfedgeTable[i, j] != null) throw new ArgumentOutOfRangeException(";)");
-                __halfedgeTable[i, j] = h;
+                gethalfedges(i, j, lhalfedges);
+                if (lhalfedges.Count!=0) throw new ArgumentOutOfRangeException(";)");
+                //__halfedgeTable[i, j] = h;
+                __halfedgeTable[i].Add(h);
             }
             foreach (var h in halfedges)
             {
                 int i = h.P.N;
                 int j = h.next.P.N;
+                gethalfedges(j, i, lhalfedges);
                 //if boundary edge...
-                if (__halfedgeTable[j, i] == null)
+                if (lhalfedges.Count==0)
                 {
                     h.pair = null;
                 }
                 else
                 {
-                    h.pair = __halfedgeTable[j, i];
+                    h.pair = lhalfedges[0];
                 }
             }
             //post process to find boundary vertices
@@ -303,37 +348,42 @@ namespace mikity.GeometryProcessing
                 if (v.hf_begin.pair.isBoundary) outerVertices.Add(v); else innerVertices.Add(v);
             }
         }
+
+                
         private void halfEdgeAdd(face f)
         {
             var _o = orient.unknown;
+            List<face> faces=new List<face>();
             for (int i = 0; i < f.corner.Count(); i++)
             {
                 int I = f.corner[i];
                 int J = (i == f.corner.Count() - 1) ? f.corner[0] : f.corner[i + 1];
-                if (_faceTable[I, J].Count == 2)
+                getfaces(I, J, faces);                
+                if (faces.Count == 2)
                 {
-                    if (_faceTable[I, J][0] == f)
+                    if (faces[0] == f)
                     {
-                        if (__orientation[_faceTable[I, J][1].N] != orient.unknown)
+                        if (__orientation[faces[1].N] != orient.unknown)
                         {
-                            _o = __orientation[_faceTable[I, J][1].N] == orient.positive ? orient.negative : orient.positive;
+                            _o = __orientation[faces[1].N] == orient.positive ? orient.negative : orient.positive;
                         }
                     }
-                    if (_faceTable[I, J][1] == f)
+                    if (faces[1] == f)
                     {
-                        if (__orientation[_faceTable[I, J][0].N] != orient.unknown)
+                        if (__orientation[faces[0].N] != orient.unknown)
                         {
-                            _o = __orientation[_faceTable[I, J][0].N] == orient.positive ? orient.negative : orient.positive;
+                            _o = __orientation[faces[0].N] == orient.positive ? orient.negative : orient.positive;
                         }
                     }
                 }
                 else
                 {
-                    if (_faceTable[J, I] != null)
+                    getfaces(J, I, faces);
+                    if (faces.Count != 0)
                     {
-                        if (__orientation[_faceTable[J, I][0].N] != orient.unknown)
+                        if (__orientation[faces[0].N] != orient.unknown)
                         {
-                            _o = __orientation[_faceTable[J, I][0].N];
+                            _o = __orientation[faces[0].N];
                         }
                     }
                 }
@@ -407,42 +457,40 @@ namespace mikity.GeometryProcessing
             {
                 int I = f.corner[i];
                 int J = (i == f.corner.Count() - 1) ? f.corner[0] : f.corner[i + 1];
-                if (_faceTable[I, J].Count == 2)
+                getfaces(I, J, faces);
+                if (faces.Count == 2)
                 {
-                    if (_faceTable[I, J][0] == f)
+                    if (faces[0] == f)
                     {
-                        if (__orientation[_faceTable[I, J][1].N] == orient.unknown)
+                        if (__orientation[faces[1].N] == orient.unknown)
                         {
-                            halfEdgeAdd(_faceTable[I, J][1]);
+                            halfEdgeAdd(faces[1]);
                         }
                     }
-                    if (_faceTable[I, J][1] == f)
+                    if (faces[1] == f)
                     {
-                        if (__orientation[_faceTable[I, J][0].N] == orient.unknown)
+                        if (__orientation[faces[0].N] == orient.unknown)
                         {
-                            halfEdgeAdd(_faceTable[I, J][0]);
+                            halfEdgeAdd(faces[0]);
                         }
                     }
                 }
                 else
                 {
-                    if (_faceTable[J, I] != null)
+                    getfaces(J, I, faces);
+                    if (faces.Count != 0)
                     {
-                        if (__orientation[_faceTable[J, I][0].N] == orient.unknown)
+                        if (__orientation[faces[0].N] == orient.unknown)
                         {
-                            halfEdgeAdd(_faceTable[J, I][0]);
+                            halfEdgeAdd(faces[0]);
                         }
                     }
                 }
             }
         }
-        private void faceTableAdd(int i, int j, face f)
+        private void faceTableAdd(int i,int j,face f)
         {
-            if (_faceTable[i, j] == null)
-            {
-                _faceTable[i, j] = new List<face>();
-            }
-            _faceTable[i, j].Add(f);
+            _faceTable[i].Add(new tuple(f,j));
         }
         private void faceTableAdd(face f)
         {
@@ -450,7 +498,7 @@ namespace mikity.GeometryProcessing
             {
                 int I = f.corner[i];
                 int J = (i == f.corner.Count() - 1) ? f.corner[0] : f.corner[i + 1];
-                faceTableAdd(I, J, f);
+                faceTableAdd(I, J,f);
             }
         }
         public static MeshStructure CreateFrom(Mesh val)

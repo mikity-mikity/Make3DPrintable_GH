@@ -19,12 +19,16 @@ namespace mikity.ghComponents
             }
             if (inMesh != null)
             {
-                args.Display.DrawMeshWires(inMesh, System.Drawing.Color.Red);
+                args.Display.DrawMeshWires(newMesh, System.Drawing.Color.Brown);
+            }
+/*            if (inMesh != null)
+            {
+                args.Display.DrawMeshShaded(inMesh, new Rhino.Display.DisplayMaterial(System.Drawing.Color.Red));
             }
             if (outMesh != null)
             {
-                args.Display.DrawMeshWires(outMesh, System.Drawing.Color.Blue);
-            }
+                args.Display.DrawMeshShaded(outMesh, new Rhino.Display.DisplayMaterial(System.Drawing.Color.Red));
+            }*/
             if (listNormal != null)
             {
                 args.Display.DrawLines(listNormal, System.Drawing.Color.Green);

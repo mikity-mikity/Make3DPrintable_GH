@@ -12,6 +12,7 @@ namespace mikity.ghComponents
     {
         public Mesh inMesh;
         public Mesh outMesh;
+        public Mesh newMesh;
         public int select = 0;
         public double thickness = 1d;
         public List<Line> listNormal;
@@ -165,6 +166,7 @@ namespace mikity.ghComponents
             }
             inMesh = myMesh.DuplicateMesh();
             outMesh = myMesh.DuplicateMesh();
+
             listNormal = new List<Line>();
             foreach (var v in MS.vertices)
             {
@@ -176,8 +178,42 @@ namespace mikity.ghComponents
                 N.Y = x[index * 3 + 1, 0];
                 N.Z = x[index * 3 + 2, 0];
 
-                listNormal.Add(new Line(nodes[v.N], nodes[v.N] + N));
+                listNormal.Add(new Line(nodes[v.N] - N * 0.5 * thickness, nodes[v.N] + N * 0.5 * thickness));
             }
+            newMesh = myMesh.DuplicateMesh();
+            newMesh.Vertices.AddVertices(new Point3f[myMesh.Vertices.Count]);
+            foreach (var v in MS.vertices)
+            {
+                int index = MS.vertices.IndexOf(v);
+                newMesh.Vertices[v.N] = new Point3f((float)(nodes[v.N].X + x[index * 3 + 0, 0] * thickness / 2d), (float)(nodes[v.N].Y + x[index * 3 + 1, 0] * thickness / 2d), (float)(nodes[v.N].Z + x[index * 3 + 2, 0] * thickness / 2d));
+                newMesh.Vertices[myMesh.Vertices.Count+v.N] = new Point3f((float)(nodes[v.N].X - x[index * 3 + 0, 0] * thickness / 2d), (float)(nodes[v.N].Y - x[index * 3 + 1, 0] * thickness / 2d), (float)(nodes[v.N].Z - x[index * 3 + 2, 0] * thickness / 2d));
+            }
+            for(int i=0;i<myMesh.Faces.Count;i++)
+            {
+                var f = newMesh.Faces[i];
+                if (f.IsTriangle)
+                {
+                    var N=newMesh.Faces.AddFace(f.C + myMesh.Vertices.Count, f.B + myMesh.Vertices.Count, f.A + myMesh.Vertices.Count);
+                }
+                else
+                {
+                    newMesh.Faces.AddFace(f.D+myMesh.Vertices.Count,f.C + myMesh.Vertices.Count, f.B + myMesh.Vertices.Count, f.A + myMesh.Vertices.Count);
+                }
+            }
+            foreach (var boundary in MS.boundaryStart)
+            {
+                var h = boundary;
+                do
+                {
+                    int a = h.P.N;
+                    int b = h.next.P.N;
+                    int c = b + myMesh.Vertices.Count;
+                    int d = a + myMesh.Vertices.Count;
+                    newMesh.Faces.AddFace(new MeshFace(d, c, b, a));
+                    h = h.next;
+                } while (h != boundary);
+            }
+            newMesh.UnifyNormals();
             DA.SetDataList(0, grads);
         }
     }
